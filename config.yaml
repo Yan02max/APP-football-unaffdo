@@ -1,0 +1,17 @@
+credentials:
+  usernames:
+    admin:
+      email: admin@unaffdo.com
+      name: Administrador
+      password: "$2b$12$X1K2dFC/N8CQKfrt.5RTGOWsNTUFQVMeHzfyfkSCPgErUZf6BLKs6"
+      role: admin
+    arbitro1:
+      email: arbitro1@unaffdo.com
+      name: Árbitro 1
+      password: "$2b$12$/T8CiFiDksjhdS6W2q9eveALIMFajC.gNCBNHbchKgE9rQ3O6FtDi"
+      role: arbitro
+
+cookie:
+  expiry_days: 7
+  key: unaffdo_secret_key_2026
+  name: unaffdo_auth

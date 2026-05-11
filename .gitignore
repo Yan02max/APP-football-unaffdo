@@ -1,0 +1,27 @@
+# Base de datos SQLite (contiene datos de juego, no va al repo)
+*.db
+*.sqlite
+*.sqlite3
+
+# Cache de Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Entornos virtuales
+venv/
+.venv/
+env/
+
+# Variables de entorno locales
+.env
+.env.local
+
+# Streamlit
+.streamlit/secrets.toml
+
+# IDEs
+.vscode/
+.idea/
+*.swp

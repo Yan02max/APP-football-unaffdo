@@ -1,0 +1,5 @@
+streamlit>=1.39.0
+streamlit-authenticator>=0.4.0
+sqlalchemy==2.0.36
+bcrypt>=4.0.0
+pyyaml>=6.0
