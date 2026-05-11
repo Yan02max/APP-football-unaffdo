@@ -355,7 +355,7 @@ def pagina_calendario():
             jornadas_str = f"Jornadas {jornadas[0]} &amp; {jornadas[-1]}" if len(jornadas) > 1 else f"Jornada {jornadas[0]}"
             total_partidos = sum(len(b) for b in bloques.values())
 
-            # Construir bloques HTML
+            # Construir HTML sin indentación para evitar que Markdown lo trate como código
             bloques_html = ""
             for bloque_num in sorted(bloques):
                 matches_html = ""
@@ -366,38 +366,41 @@ def pagina_calendario():
                         mid = f'<span class="match-result">{p.puntos_local} - {p.puntos_visitante}</span>'
                     else:
                         mid = '<span class="match-at">AT</span>'
-                    matches_html += f"""
-                    <div class="match-row">
-                        <span class="match-team">{local}</span>
-                        {mid}
-                        <span class="match-team right">{visitante}</span>
-                    </div>"""
-                bloques_html += f"""
-                <div class="block-section">
-                    <div class="block-label">Bloque {bloque_num}</div>
-                    {matches_html}
-                </div>"""
+                    matches_html += (
+                        f'<div class="match-row">'
+                        f'<span class="match-team">{local}</span>'
+                        f'{mid}'
+                        f'<span class="match-team right">{visitante}</span>'
+                        f'</div>'
+                    )
+                bloques_html += (
+                    f'<div class="block-section">'
+                    f'<div class="block-label">Bloque {bloque_num}</div>'
+                    f'{matches_html}'
+                    f'</div>'
+                )
 
-            st.markdown(f"""
-            <div class="day-card">
-                <div class="day-header">
-                    <div class="day-number-block">
-                        <span class="day-label">Domingo</span>
-                        <span class="day-num">{dia_idx}</span>
-                    </div>
-                    <div class="day-info">
-                        <div class="day-date">{fecha.strftime('%d de %b, %Y').upper()}</div>
-                        <div class="day-jornadas">{jornadas_str}</div>
-                    </div>
-                </div>
-                {bloques_html}
-                <div class="day-footer">
-                    UNAFFDO &middot; República Dominicana &middot;
-                    Domingo {dia_idx} de {len(fechas)} &middot;
-                    {total_partidos} Partidos &middot; {len(bloques)} Bloques
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+            html = (
+                f'<div class="day-card">'
+                f'<div class="day-header">'
+                f'<div class="day-number-block">'
+                f'<span class="day-label">Domingo</span>'
+                f'<span class="day-num">{dia_idx}</span>'
+                f'</div>'
+                f'<div class="day-info">'
+                f'<div class="day-date">{fecha.strftime("%d de %b, %Y").upper()}</div>'
+                f'<div class="day-jornadas">{jornadas_str}</div>'
+                f'</div>'
+                f'</div>'
+                f'{bloques_html}'
+                f'<div class="day-footer">'
+                f'UNAFFDO &middot; Rep&uacute;blica Dominicana &middot; '
+                f'Domingo {dia_idx} de {len(fechas)} &middot; '
+                f'{total_partidos} Partidos &middot; {len(bloques)} Bloques'
+                f'</div>'
+                f'</div>'
+            )
+            st.markdown(html, unsafe_allow_html=True)
     finally:
         session.close()
 
@@ -423,42 +426,24 @@ def pagina_clasificacion():
         filas_html = ""
         for pos, s in enumerate(tabla, 1):
             dif_str = f"+{s['DIF']}" if s['DIF'] > 0 else str(s['DIF'])
-            filas_html += f"""
-            <tr>
-                <td class="pos">{pos}</td>
-                <td class="team-name">{s['equipo']}</td>
-                <td>{s['PJ']}</td>
-                <td>{s['G']}</td>
-                <td>{s['P']}</td>
-                <td>{s['PF']}</td>
-                <td>{s['PC']}</td>
-                <td>{dif_str}</td>
-                <td class="pts">{s['Pts']}</td>
-            </tr>"""
+            filas_html += (
+                f'<tr>'
+                f'<td class="pos">{pos}</td>'
+                f'<td class="team-name">{s["equipo"]}</td>'
+                f'<td>{s["PJ"]}</td><td>{s["G"]}</td><td>{s["P"]}</td>'
+                f'<td>{s["PF"]}</td><td>{s["PC"]}</td>'
+                f'<td>{dif_str}</td>'
+                f'<td class="pts">{s["Pts"]}</td>'
+                f'</tr>'
+            )
 
-        st.markdown(f"""
-        <table class="standings-table">
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Equipo</th>
-                    <th>PJ</th>
-                    <th>G</th>
-                    <th>P</th>
-                    <th>PF</th>
-                    <th>PC</th>
-                    <th>DIF</th>
-                    <th>PTS</th>
-                </tr>
-            </thead>
-            <tbody>{filas_html}</tbody>
-        </table>
-        <div class="standings-footer">
-            PJ: Partidos Jugados &middot; G: Ganados &middot; P: Perdidos &middot;
-            PF: Puntos a Favor &middot; PC: Puntos en Contra &middot; DIF: Diferencial
-            <br><br>Temporada Regular &middot; Pre-Temporada
-        </div>
-        """, unsafe_allow_html=True)
+        thead = '<th>#</th><th>Equipo</th><th>PJ</th><th>G</th><th>P</th><th>PF</th><th>PC</th><th>DIF</th><th>PTS</th>'
+        footer_txt = 'PJ: Partidos Jugados &middot; G: Ganados &middot; P: Perdidos &middot; PF: Puntos a Favor &middot; PC: Puntos en Contra &middot; DIF: Diferencial<br><br>Temporada Regular &middot; Pre-Temporada'
+        st.markdown(
+            f'<table class="standings-table"><thead><tr>{thead}</tr></thead><tbody>{filas_html}</tbody></table>'
+            f'<div class="standings-footer">{footer_txt}</div>',
+            unsafe_allow_html=True,
+        )
     finally:
         session.close()
 
