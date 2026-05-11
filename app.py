@@ -199,19 +199,22 @@ def sidebar_nav():
 
         st.divider()
         opciones = ["📅 Calendario", "🏆 Clasificación"]
-        if esta_autenticado():
-            if es_arbitro():
-                opciones.append("⚽ Registrar Resultados")
-            if es_admin():
-                opciones.append("⚙️ Gestionar Equipos")
-        else:
-            opciones.append("🔐 Iniciar Sesión")
+        if es_arbitro():
+            opciones.append("⚽ Registrar Resultados")
+        if es_admin():
+            opciones.append("⚙️ Gestionar Equipos")
 
         return st.radio("Ir a:", opciones, label_visibility="collapsed")
 
 
 # ── Página login ───────────────────────────────────────────────────────────────
 def pagina_login():
+    # Ocultar sidebar completo en la pantalla de login
+    st.markdown(
+        '<style>[data-testid="stSidebar"]{display:none!important}'
+        '[data-testid="stSidebarCollapsedControl"]{display:none!important}</style>',
+        unsafe_allow_html=True,
+    )
     # Fondo y blobs (posición fixed, detrás del contenido)
     st.markdown(
         '<div class="login-bg"></div>'
@@ -488,6 +491,11 @@ def pagina_gestionar_equipos():
 
 
 # ── Punto de entrada ───────────────────────────────────────────────────────────
+# Mostrar login como pantalla inicial si el usuario no está autenticado
+if not esta_autenticado():
+    pagina_login()
+    st.stop()
+
 pagina_activa = sidebar_nav()
 
 if pagina_activa == "📅 Calendario":
@@ -498,5 +506,3 @@ elif pagina_activa == "⚽ Registrar Resultados":
     pagina_registrar_resultados()
 elif pagina_activa == "⚙️ Gestionar Equipos":
     pagina_gestionar_equipos()
-elif pagina_activa == "🔐 Iniciar Sesión":
-    pagina_login()
