@@ -652,8 +652,8 @@ def pagina_gestionar_equipos():
             else:
                 s = get_session()
                 try:
-                    if s.query(Equipo).filter_by(nombre=nuevo_nombre.strip()).first():
-                        st.error(f"Ya existe un equipo llamado '{nuevo_nombre.strip()}'.")
+                    if s.query(Equipo).filter_by(nombre=nuevo_nombre.strip(), categoria=nueva_categoria).first():
+                        st.error(f"Ya existe un equipo llamado '{nuevo_nombre.strip()}' en categoría {nueva_categoria}.")
                     else:
                         s.add(Equipo(
                             nombre=nuevo_nombre.strip(),

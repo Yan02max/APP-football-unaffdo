@@ -1,14 +1,15 @@
 """Modelos ORM: Equipo, Temporada, Partido."""
-from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 
 
 class Equipo(Base):
     __tablename__ = "equipos"
+    __table_args__ = (UniqueConstraint("nombre", "categoria", name="uq_equipo_nombre_cat"),)
 
     id = Column(Integer, primary_key=True)
-    nombre = Column(String(100), nullable=False, unique=True)
+    nombre = Column(String(100), nullable=False)
     abreviacion = Column(String(10), nullable=False)
     color_principal = Column(String(7), default="#000000")
     color_secundario = Column(String(7), default="#FFFFFF")

@@ -45,6 +45,16 @@ def _migrar_schema():
                 conn.commit()
             print(f"[OK] Columna '{columna}' agregada a '{tabla}'.")
 
+    # Reemplazar unique(nombre) por unique(nombre, categoria) en equipos
+    if "equipos" in tablas:
+        with engine.connect() as conn:
+            conn.execute(text("DROP INDEX IF EXISTS ix_equipos_nombre"))
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_equipo_nombre_cat "
+                "ON equipos(nombre, categoria)"
+            ))
+            conn.commit()
+
 
 def _crear_temporada_y_calendario(session, nombre, categoria, fecha_inicio, equipos):
     """Crea una Temporada y genera su calendario round-robin."""
