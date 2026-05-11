@@ -1,5 +1,4 @@
 """Modelos ORM: Equipo, Temporada, Partido."""
-# Usamos Column() clásico para compatibilidad con Python 3.14
 from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey
 from sqlalchemy.orm import relationship
 from database import Base
@@ -14,6 +13,7 @@ class Equipo(Base):
     color_principal = Column(String(7), default="#000000")
     color_secundario = Column(String(7), default="#FFFFFF")
     logo_path = Column(String(255), nullable=True)
+    categoria = Column(String(50), nullable=False, default="Masculino")
 
     partidos_local = relationship(
         "Partido", foreign_keys="Partido.equipo_local_id", back_populates="equipo_local"
@@ -31,6 +31,7 @@ class Temporada(Base):
     fecha_inicio = Column(Date, nullable=False)
     fecha_fin = Column(Date, nullable=False)
     activa = Column(Boolean, default=True)
+    categoria = Column(String(50), nullable=False, default="Masculino")
 
     partidos = relationship("Partido", back_populates="temporada")
 
@@ -41,11 +42,11 @@ class Partido(Base):
     id = Column(Integer, primary_key=True)
     temporada_id = Column(Integer, ForeignKey("temporadas.id"), nullable=False)
     jornada = Column(Integer, nullable=False)
-    bloque = Column(Integer, nullable=False)          # 1 o 2
+    bloque = Column(Integer, nullable=False)
     equipo_local_id = Column(Integer, ForeignKey("equipos.id"), nullable=False)
     equipo_visitante_id = Column(Integer, ForeignKey("equipos.id"), nullable=False)
     fecha = Column(Date, nullable=False)
-    puntos_local = Column(Integer, nullable=True)     # NULL = partido no jugado
+    puntos_local = Column(Integer, nullable=True)
     puntos_visitante = Column(Integer, nullable=True)
 
     temporada = relationship("Temporada", back_populates="partidos")

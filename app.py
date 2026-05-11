@@ -209,13 +209,11 @@ def sidebar_nav():
 
 # ── Página login ───────────────────────────────────────────────────────────────
 def pagina_login():
-    # Ocultar sidebar completo en la pantalla de login
     st.markdown(
         '<style>[data-testid="stSidebar"]{display:none!important}'
         '[data-testid="stSidebarCollapsedControl"]{display:none!important}</style>',
         unsafe_allow_html=True,
     )
-    # Fondo y blobs (posición fixed, detrás del contenido)
     st.markdown(
         '<div class="login-bg"></div>'
         '<div class="login-blob1"></div>'
@@ -223,7 +221,6 @@ def pagina_login():
         unsafe_allow_html=True,
     )
 
-    # Centrar el card con columnas
     _, col, _ = st.columns([1, 1.4, 1])
     with col:
         st.markdown(
@@ -235,7 +232,6 @@ def pagina_login():
             unsafe_allow_html=True,
         )
 
-        # El form se renderiza fuera del HTML pero la CSS lo apunta
         with st.container():
             st.markdown('<div class="login-card" style="margin-top:-16px;padding-top:24px;">', unsafe_allow_html=True)
             with st.form("login_form", border=False):
@@ -252,135 +248,161 @@ def pagina_login():
                 st.markdown('<div class="login-error">Usuario o contraseña incorrectos.</div>', unsafe_allow_html=True)
 
 
+# ── Helper: renderiza el calendario de una temporada ──────────────────────────
+def _render_calendario(session, temporada):
+    partidos = (
+        session.query(Partido)
+        .filter_by(temporada_id=temporada.id)
+        .order_by(Partido.fecha, Partido.bloque)
+        .all()
+    )
+    equipos_map = {e.id: e for e in session.query(Equipo).filter_by(categoria=temporada.categoria).all()}
+
+    domingos: dict[date, dict[int, list]] = {}
+    for p in partidos:
+        domingos.setdefault(p.fecha, {}).setdefault(p.bloque, []).append(p)
+
+    fechas = sorted(domingos)
+    if not fechas:
+        st.info("No hay partidos programados aún para esta categoría.")
+        return
+
+    for dia_idx, fecha in enumerate(fechas, 1):
+        bloques = domingos[fecha]
+        jornadas = sorted({p.jornada for b in bloques.values() for p in b})
+        jornadas_str = (
+            f"Jornadas {jornadas[0]} &amp; {jornadas[-1]}"
+            if len(jornadas) > 1 else f"Jornada {jornadas[0]}"
+        )
+        total_partidos = sum(len(b) for b in bloques.values())
+
+        bloques_html = ""
+        for bloque_num in sorted(bloques):
+            matches_html = ""
+            for p in bloques[bloque_num]:
+                local = equipos_map[p.equipo_local_id].nombre
+                visitante = equipos_map[p.equipo_visitante_id].nombre
+                mid = (
+                    f'<span class="match-result">{p.puntos_local} - {p.puntos_visitante}</span>'
+                    if p.puntos_local is not None
+                    else '<span class="match-at">AT</span>'
+                )
+                matches_html += (
+                    f'<div class="match-row">'
+                    f'<span class="match-team">{local}</span>'
+                    f'{mid}'
+                    f'<span class="match-team right">{visitante}</span>'
+                    f'</div>'
+                )
+            bloques_html += (
+                f'<div class="block-section">'
+                f'<div class="block-label">Bloque {bloque_num}</div>'
+                f'{matches_html}'
+                f'</div>'
+            )
+
+        html = (
+            f'<div class="day-card">'
+            f'<div class="day-header">'
+            f'<div class="day-number-block">'
+            f'<span class="day-label">Domingo</span>'
+            f'<span class="day-num">{dia_idx}</span>'
+            f'</div>'
+            f'<div class="day-info">'
+            f'<div class="day-date">{fecha.strftime("%d de %b, %Y").upper()}</div>'
+            f'<div class="day-jornadas">{jornadas_str}</div>'
+            f'</div></div>'
+            f'{bloques_html}'
+            f'<div class="day-footer">'
+            f'UNAFFDO &middot; Rep&uacute;blica Dominicana &middot; '
+            f'Domingo {dia_idx} de {len(fechas)} &middot; '
+            f'{total_partidos} Partidos &middot; {len(bloques)} Bloques'
+            f'</div></div>'
+        )
+        st.markdown(html, unsafe_allow_html=True)
+
+
 # ── Página calendario ──────────────────────────────────────────────────────────
 def pagina_calendario():
     st.markdown(
         "<div class='unaffdo-header'>Schedule</div>"
-        "<div class='unaffdo-sub'>Release &middot; Temporada 2026 &middot; Primera Divisi&oacute;n &middot; Masculino</div>"
+        "<div class='unaffdo-sub'>Temporada 2026 &middot; Primera Divisi&oacute;n</div>"
         "<div class='unaffdo-divider'></div>",
         unsafe_allow_html=True,
     )
     session = get_session()
     try:
-        temporada = session.query(Temporada).filter_by(activa=True).first()
-        if not temporada:
+        temporadas = session.query(Temporada).filter_by(activa=True).order_by(Temporada.categoria).all()
+        if not temporadas:
             st.warning("No hay temporada activa.")
             return
 
-        partidos = (
-            session.query(Partido)
-            .filter_by(temporada_id=temporada.id)
-            .order_by(Partido.fecha, Partido.bloque)
-            .all()
-        )
-        equipos_map = {e.id: e for e in session.query(Equipo).all()}
-
-        domingos: dict[date, dict[int, list]] = {}
-        for p in partidos:
-            domingos.setdefault(p.fecha, {}).setdefault(p.bloque, []).append(p)
-
-        fechas = sorted(domingos)
-        for dia_idx, fecha in enumerate(fechas, 1):
-            bloques = domingos[fecha]
-            jornadas = sorted({p.jornada for b in bloques.values() for p in b})
-            jornadas_str = (
-                f"Jornadas {jornadas[0]} &amp; {jornadas[-1]}"
-                if len(jornadas) > 1 else f"Jornada {jornadas[0]}"
-            )
-            total_partidos = sum(len(b) for b in bloques.values())
-
-            bloques_html = ""
-            for bloque_num in sorted(bloques):
-                matches_html = ""
-                for p in bloques[bloque_num]:
-                    local = equipos_map[p.equipo_local_id].nombre
-                    visitante = equipos_map[p.equipo_visitante_id].nombre
-                    mid = (
-                        f'<span class="match-result">{p.puntos_local} - {p.puntos_visitante}</span>'
-                        if p.puntos_local is not None
-                        else '<span class="match-at">AT</span>'
-                    )
-                    matches_html += (
-                        f'<div class="match-row">'
-                        f'<span class="match-team">{local}</span>'
-                        f'{mid}'
-                        f'<span class="match-team right">{visitante}</span>'
-                        f'</div>'
-                    )
-                bloques_html += (
-                    f'<div class="block-section">'
-                    f'<div class="block-label">Bloque {bloque_num}</div>'
-                    f'{matches_html}'
-                    f'</div>'
-                )
-
-            html = (
-                f'<div class="day-card">'
-                f'<div class="day-header">'
-                f'<div class="day-number-block">'
-                f'<span class="day-label">Domingo</span>'
-                f'<span class="day-num">{dia_idx}</span>'
-                f'</div>'
-                f'<div class="day-info">'
-                f'<div class="day-date">{fecha.strftime("%d de %b, %Y").upper()}</div>'
-                f'<div class="day-jornadas">{jornadas_str}</div>'
-                f'</div></div>'
-                f'{bloques_html}'
-                f'<div class="day-footer">'
-                f'UNAFFDO &middot; Rep&uacute;blica Dominicana &middot; '
-                f'Domingo {dia_idx} de {len(fechas)} &middot; '
-                f'{total_partidos} Partidos &middot; {len(bloques)} Bloques'
-                f'</div></div>'
-            )
-            st.markdown(html, unsafe_allow_html=True)
+        if len(temporadas) > 1:
+            tabs = st.tabs([t.categoria for t in temporadas])
+            for tab, temporada in zip(tabs, temporadas):
+                with tab:
+                    _render_calendario(session, temporada)
+        else:
+            _render_calendario(session, temporadas[0])
     finally:
         session.close()
+
+
+# ── Helper: renderiza la tabla de clasificación de una temporada ───────────────
+def _render_clasificacion(session, temporada):
+    partidos = session.query(Partido).filter_by(temporada_id=temporada.id).all()
+    equipos  = session.query(Equipo).filter_by(categoria=temporada.categoria).all()
+    tabla    = calcular_clasificacion(partidos, equipos)
+
+    filas_html = ""
+    for pos, s in enumerate(tabla, 1):
+        dif_str = f"+{s['DIF']}" if s['DIF'] > 0 else str(s['DIF'])
+        filas_html += (
+            f'<tr>'
+            f'<td class="pos">{pos}</td>'
+            f'<td class="team-name">{s["equipo"]}</td>'
+            f'<td>{s["PJ"]}</td><td>{s["G"]}</td><td>{s["P"]}</td>'
+            f'<td>{s["PF"]}</td><td>{s["PC"]}</td>'
+            f'<td>{dif_str}</td>'
+            f'<td class="pts">{s["Pts"]}</td>'
+            f'</tr>'
+        )
+
+    thead = '<th>#</th><th>Equipo</th><th>PJ</th><th>G</th><th>P</th><th>PF</th><th>PC</th><th>DIF</th><th>PTS</th>'
+    footer = (
+        'PJ: Partidos Jugados &middot; G: Ganados &middot; P: Perdidos &middot; '
+        'PF: Puntos a Favor &middot; PC: Puntos en Contra &middot; DIF: Diferencial'
+        '<br><br>Temporada Regular &middot; Pre-Temporada'
+    )
+    st.markdown(
+        f'<table class="standings-table"><thead><tr>{thead}</tr></thead><tbody>{filas_html}</tbody></table>'
+        f'<div class="standings-footer">{footer}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 # ── Página clasificación ───────────────────────────────────────────────────────
 def pagina_clasificacion():
     st.markdown(
         "<div class='unaffdo-header'>Clasificaci&oacute;n</div>"
-        "<div class='unaffdo-sub'>Primera Divisi&oacute;n &middot; Masculino</div>"
+        "<div class='unaffdo-sub'>Primera Divisi&oacute;n</div>"
         "<div class='unaffdo-divider'></div>",
         unsafe_allow_html=True,
     )
     session = get_session()
     try:
-        temporada = session.query(Temporada).filter_by(activa=True).first()
-        if not temporada:
+        temporadas = session.query(Temporada).filter_by(activa=True).order_by(Temporada.categoria).all()
+        if not temporadas:
             st.warning("No hay temporada activa.")
             return
 
-        partidos = session.query(Partido).filter_by(temporada_id=temporada.id).all()
-        equipos  = session.query(Equipo).all()
-        tabla    = calcular_clasificacion(partidos, equipos)
-
-        filas_html = ""
-        for pos, s in enumerate(tabla, 1):
-            dif_str = f"+{s['DIF']}" if s['DIF'] > 0 else str(s['DIF'])
-            filas_html += (
-                f'<tr>'
-                f'<td class="pos">{pos}</td>'
-                f'<td class="team-name">{s["equipo"]}</td>'
-                f'<td>{s["PJ"]}</td><td>{s["G"]}</td><td>{s["P"]}</td>'
-                f'<td>{s["PF"]}</td><td>{s["PC"]}</td>'
-                f'<td>{dif_str}</td>'
-                f'<td class="pts">{s["Pts"]}</td>'
-                f'</tr>'
-            )
-
-        thead = '<th>#</th><th>Equipo</th><th>PJ</th><th>G</th><th>P</th><th>PF</th><th>PC</th><th>DIF</th><th>PTS</th>'
-        footer = (
-            'PJ: Partidos Jugados &middot; G: Ganados &middot; P: Perdidos &middot; '
-            'PF: Puntos a Favor &middot; PC: Puntos en Contra &middot; DIF: Diferencial'
-            '<br><br>Temporada Regular &middot; Pre-Temporada'
-        )
-        st.markdown(
-            f'<table class="standings-table"><thead><tr>{thead}</tr></thead><tbody>{filas_html}</tbody></table>'
-            f'<div class="standings-footer">{footer}</div>',
-            unsafe_allow_html=True,
-        )
+        if len(temporadas) > 1:
+            tabs = st.tabs([t.categoria for t in temporadas])
+            for tab, temporada in zip(tabs, temporadas):
+                with tab:
+                    _render_clasificacion(session, temporada)
+        else:
+            _render_clasificacion(session, temporadas[0])
     finally:
         session.close()
 
@@ -440,15 +462,18 @@ def pagina_registrar_resultados():
 
     session = get_session()
     try:
-        temporada = session.query(Temporada).filter_by(activa=True).first()
-        if not temporada:
+        temporadas_activas = session.query(Temporada).filter_by(activa=True).all()
+        if not temporadas_activas:
             st.warning("No hay temporada activa.")
             return
 
+        ids_temporadas = [t.id for t in temporadas_activas]
+        temporadas_map = {t.id: t for t in temporadas_activas}
+
         pendientes = (
             session.query(Partido)
-            .filter(Partido.temporada_id == temporada.id, Partido.puntos_local.is_(None))
-            .order_by(Partido.jornada, Partido.bloque)
+            .filter(Partido.temporada_id.in_(ids_temporadas), Partido.puntos_local.is_(None))
+            .order_by(Partido.temporada_id, Partido.jornada, Partido.bloque)
             .all()
         )
         if not pendientes:
@@ -456,8 +481,9 @@ def pagina_registrar_resultados():
             return
 
         equipos_map = {e.id: e for e in session.query(Equipo).all()}
+        cat_label = lambda p: temporadas_map[p.temporada_id].categoria
         opciones = {
-            f"J{p.jornada} B{p.bloque} | {equipos_map[p.equipo_local_id].nombre} vs {equipos_map[p.equipo_visitante_id].nombre}": p.id
+            f"[{cat_label(p)}] J{p.jornada} B{p.bloque} | {equipos_map[p.equipo_local_id].nombre} vs {equipos_map[p.equipo_visitante_id].nombre}": p.id
             for p in pendientes
         }
 
@@ -468,7 +494,6 @@ def pagina_registrar_resultados():
         local_nombre     = equipos_map[partido.equipo_local_id].nombre
         visitante_nombre = equipos_map[partido.equipo_visitante_id].nombre
 
-        # Resetear marcador si cambia el partido seleccionado
         if st.session_state.get("scoring_partido_id") != partido_id:
             st.session_state["scoring_partido_id"] = partido_id
             st.session_state["score_local"]     = 0
@@ -560,13 +585,43 @@ def pagina_registrar_resultados():
                 partido.puntos_local     = sl
                 partido.puntos_visitante = sv
                 session.commit()
-                # Limpiar estado del marcador
                 for k in ["score_local", "score_visitante", "scoring_partido_id"]:
                     st.session_state.pop(k, None)
                 st.success(f"Resultado guardado: {local_nombre} {sl} — {sv} {visitante_nombre}")
                 st.rerun()
     finally:
         session.close()
+
+
+# ── Helper: formularios de edición de equipos ─────────────────────────────────
+def _render_equipo_forms(session, equipos_lista):
+    CATEGORIAS = ["Masculino", "Femenino"]
+    for equipo in equipos_lista:
+        with st.expander(f"{equipo.nombre} ({equipo.abreviacion})"):
+            with st.form(key=f"form_{equipo.id}"):
+                nombre = st.text_input("Nombre", value=equipo.nombre)
+                col_a, col_cat = st.columns([2, 1])
+                with col_a:
+                    abrev = st.text_input("Abreviación", value=equipo.abreviacion)
+                with col_cat:
+                    idx_cat = CATEGORIAS.index(equipo.categoria) if equipo.categoria in CATEGORIAS else 0
+                    categoria = st.selectbox("Categoría", CATEGORIAS, index=idx_cat, key=f"cat_{equipo.id}")
+                col1, col2 = st.columns(2)
+                with col1:
+                    color1 = st.color_picker("Color principal", value=equipo.color_principal)
+                with col2:
+                    color2 = st.color_picker("Color secundario", value=equipo.color_secundario)
+                logo = st.text_input("Ruta del logo (opcional)", value=equipo.logo_path or "")
+                if st.form_submit_button("Guardar cambios"):
+                    equipo.nombre           = nombre
+                    equipo.abreviacion      = abrev
+                    equipo.color_principal  = color1
+                    equipo.color_secundario = color2
+                    equipo.logo_path        = logo or None
+                    equipo.categoria        = categoria
+                    session.commit()
+                    st.success("Equipo actualizado.")
+                    st.rerun()
 
 
 # ── Página gestionar equipos ───────────────────────────────────────────────────
@@ -581,28 +636,94 @@ def pagina_gestionar_equipos():
         "<div class='unaffdo-divider'></div>",
         unsafe_allow_html=True,
     )
+
+    # ── Agregar nuevo equipo ──────────────────────────────────────────────────
+    st.subheader("Agregar equipo")
+    with st.form("form_nuevo_equipo"):
+        col_n, col_a = st.columns([3, 1])
+        with col_n:
+            nuevo_nombre = st.text_input("Nombre del equipo")
+        with col_a:
+            nuevo_abrev = st.text_input("Abreviación (3 letras)")
+        col_c1, col_c2, col_cat = st.columns(3)
+        with col_c1:
+            nuevo_color1 = st.color_picker("Color principal", value="#000000")
+        with col_c2:
+            nuevo_color2 = st.color_picker("Color secundario", value="#FFFFFF")
+        with col_cat:
+            nueva_categoria = st.selectbox("Categoría", ["Masculino", "Femenino"])
+        if st.form_submit_button("Agregar equipo", type="primary"):
+            if not nuevo_nombre.strip() or not nuevo_abrev.strip():
+                st.error("Nombre y abreviación son obligatorios.")
+            else:
+                s = get_session()
+                try:
+                    s.add(Equipo(
+                        nombre=nuevo_nombre.strip(),
+                        abreviacion=nuevo_abrev.strip().upper(),
+                        color_principal=nuevo_color1,
+                        color_secundario=nuevo_color2,
+                        categoria=nueva_categoria,
+                    ))
+                    s.commit()
+                    st.success(f"Equipo '{nuevo_nombre.strip()}' agregado a categoría {nueva_categoria}.")
+                    st.rerun()
+                except Exception as exc:
+                    s.rollback()
+                    st.error(f"Error: {exc}")
+                finally:
+                    s.close()
+
+    st.divider()
+
+    # ── Equipos existentes por categoría ─────────────────────────────────────
     session = get_session()
     try:
-        for equipo in session.query(Equipo).order_by(Equipo.nombre).all():
-            with st.expander(f"{equipo.nombre} ({equipo.abreviacion})"):
-                with st.form(key=f"form_{equipo.id}"):
-                    nombre = st.text_input("Nombre", value=equipo.nombre)
-                    abrev  = st.text_input("Abreviación", value=equipo.abreviacion)
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        color1 = st.color_picker("Color principal", value=equipo.color_principal)
-                    with col2:
-                        color2 = st.color_picker("Color secundario", value=equipo.color_secundario)
-                    logo = st.text_input("Ruta del logo (opcional)", value=equipo.logo_path or "")
-                    if st.form_submit_button("Guardar cambios"):
-                        equipo.nombre          = nombre
-                        equipo.abreviacion     = abrev
-                        equipo.color_principal  = color1
-                        equipo.color_secundario = color2
-                        equipo.logo_path        = logo or None
-                        session.commit()
-                        st.success("Equipo actualizado.")
-                        st.rerun()
+        todos = session.query(Equipo).order_by(Equipo.categoria, Equipo.nombre).all()
+        categorias_presentes = sorted({e.categoria for e in todos})
+
+        if len(categorias_presentes) > 1:
+            tabs = st.tabs(categorias_presentes)
+            for tab, cat in zip(tabs, categorias_presentes):
+                with tab:
+                    _render_equipo_forms(session, [e for e in todos if e.categoria == cat])
+        else:
+            _render_equipo_forms(session, todos)
+
+        # ── Generar calendario Femenino si no existe aún ─────────────────────
+        equipos_fem = [e for e in todos if e.categoria == "Femenino"]
+        tem_fem = session.query(Temporada).filter_by(categoria="Femenino", activa=True).first()
+
+        if equipos_fem and not tem_fem:
+            n_fem = len(equipos_fem)
+            st.divider()
+            if n_fem >= 2 and n_fem % 2 == 0:
+                st.subheader("Generar calendario Femenino")
+                st.info(f"{n_fem} equipos listos. Elige la fecha de inicio y genera el calendario.")
+                with st.form("form_gen_cal_fem"):
+                    fecha_ini_fem = st.date_input("Fecha de inicio", value=date.today())
+                    nombre_tem_fem = st.text_input("Nombre de la temporada", value="UNAFFDO 2026 - Femenino")
+                    if st.form_submit_button("Generar calendario Femenino", type="primary"):
+                        from init_db import _crear_temporada_y_calendario
+                        s2 = get_session()
+                        try:
+                            equipos_fem2 = s2.query(Equipo).filter_by(categoria="Femenino").all()
+                            _, n_p = _crear_temporada_y_calendario(
+                                s2, nombre_tem_fem, "Femenino", fecha_ini_fem, equipos_fem2
+                            )
+                            s2.commit()
+                            st.success(f"Calendario Femenino generado: {n_p} partidos.")
+                            st.rerun()
+                        except Exception as exc:
+                            s2.rollback()
+                            st.error(f"Error: {exc}")
+                        finally:
+                            s2.close()
+            else:
+                st.info(
+                    f"Hay {n_fem} equipo(s) en categoría Femenino. "
+                    "Se necesita un número par (mínimo 2) para generar el calendario."
+                )
     finally:
         session.close()
 
@@ -616,7 +737,6 @@ def pagina_gestionar_equipos():
         unsafe_allow_html=True,
     )
 
-    # ── Opción 1: borrar solo los resultados ─────────────────────────────────
     with st.expander("Borrar todos los resultados (mantiene el calendario)"):
         st.warning(
             "Esto pone a NULL los marcadores de todos los partidos. "
@@ -627,18 +747,15 @@ def pagina_gestionar_equipos():
             key="confirm_borrar_resultados",
         )
         if st.button("Borrar resultados", type="primary", disabled=not confirmar1, key="btn_borrar_res"):
-            session2 = get_session()
+            s3 = get_session()
             try:
-                session2.query(Partido).update(
-                    {"puntos_local": None, "puntos_visitante": None}
-                )
-                session2.commit()
+                s3.query(Partido).update({"puntos_local": None, "puntos_visitante": None})
+                s3.commit()
                 st.success("Resultados eliminados. La tabla de posiciones está en cero.")
                 st.rerun()
             finally:
-                session2.close()
+                s3.close()
 
-    # ── Opción 2: reinicio completo del torneo ────────────────────────────────
     with st.expander("Reinicio completo del torneo (borra TODO y regenera)"):
         st.error(
             "Esto elimina equipos, temporada, partidos y resultados, "
@@ -656,7 +773,6 @@ def pagina_gestionar_equipos():
 
 
 # ── Punto de entrada ───────────────────────────────────────────────────────────
-# Mostrar login como pantalla inicial si el usuario no está autenticado
 if not esta_autenticado():
     pagina_login()
     st.stop()
