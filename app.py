@@ -589,17 +589,11 @@ def pagina_registrar_resultados():
 
 # ── Helper: formularios de edición de equipos ─────────────────────────────────
 def _render_equipo_forms(session, equipos_lista):
-    CATEGORIAS = ["Masculino", "Femenino"]
     for equipo in equipos_lista:
-        with st.expander(f"{equipo.nombre} ({equipo.abreviacion})"):
-            with st.form(key=f"form_{equipo.id}"):
+        with st.expander(f"{equipo.nombre} ({equipo.abreviacion}) · {equipo.categoria}"):
+            with st.form(key=f"form_edit_{equipo.id}"):
                 nombre = st.text_input("Nombre", value=equipo.nombre)
-                col_a, col_cat = st.columns([2, 1])
-                with col_a:
-                    abrev = st.text_input("Abreviación", value=equipo.abreviacion)
-                with col_cat:
-                    idx_cat = CATEGORIAS.index(equipo.categoria) if equipo.categoria in CATEGORIAS else 0
-                    categoria = st.selectbox("Categoría", CATEGORIAS, index=idx_cat, key=f"cat_{equipo.id}")
+                abrev  = st.text_input("Abreviación", value=equipo.abreviacion)
                 col1, col2 = st.columns(2)
                 with col1:
                     color1 = st.color_picker("Color principal", value=equipo.color_principal)
@@ -612,9 +606,24 @@ def _render_equipo_forms(session, equipos_lista):
                     equipo.color_principal  = color1
                     equipo.color_secundario = color2
                     equipo.logo_path        = logo or None
-                    equipo.categoria        = categoria
                     session.commit()
                     st.success("Equipo actualizado.")
+                    st.rerun()
+
+            st.markdown("---")
+            tiene_partidos = session.query(Partido).filter(
+                (Partido.equipo_local_id == equipo.id) |
+                (Partido.equipo_visitante_id == equipo.id)
+            ).count() > 0
+            if tiene_partidos:
+                st.caption("Este equipo tiene partidos asignados. Para eliminarlo usa Reinicio completo.")
+            else:
+                confirmar = st.checkbox("Confirmar eliminación", key=f"del_chk_{equipo.id}")
+                if st.button("Eliminar equipo", key=f"del_btn_{equipo.id}",
+                             disabled=not confirmar, type="primary"):
+                    session.delete(equipo)
+                    session.commit()
+                    st.success(f"Equipo '{equipo.nombre}' eliminado.")
                     st.rerun()
 
 
