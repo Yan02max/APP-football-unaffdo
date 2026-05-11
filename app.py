@@ -385,6 +385,45 @@ def pagina_clasificacion():
         session.close()
 
 
+# ── CSS extra: marcador IFAF ───────────────────────────────────────────────────
+SCORING_CSS = """
+<style>
+.score-board {
+    display:flex; align-items:stretch; gap:12px;
+    background:var(--card); border-radius:8px;
+    padding:20px; margin:16px 0;
+}
+.score-team-block { flex:1; text-align:center; }
+.score-team-name {
+    font-family:'Barlow Condensed',sans-serif;
+    font-size:1.1rem; font-weight:700; letter-spacing:2px;
+    color:var(--gold); text-transform:uppercase; margin-bottom:8px;
+}
+.score-display {
+    font-family:'Barlow Condensed',sans-serif;
+    font-size:5rem; font-weight:800; color:var(--white);
+    line-height:1; margin:4px 0 12px;
+}
+.score-sep {
+    font-family:'Barlow Condensed',sans-serif;
+    font-size:3rem; font-weight:700; color:var(--muted);
+    align-self:center; padding:0 8px;
+}
+.ifaf-legend {
+    display:flex; flex-wrap:wrap; gap:8px;
+    background:var(--row2); border-radius:6px;
+    padding:12px 16px; margin-bottom:16px;
+    font-family:'Barlow Condensed',sans-serif;
+}
+.ifaf-badge {
+    background:var(--row1); border:1px solid #2A2A40;
+    border-radius:4px; padding:4px 10px;
+    font-size:.8rem; font-weight:600; letter-spacing:1px; color:var(--white);
+}
+.ifaf-badge span { color:var(--gold); font-weight:800; margin-right:4px; }
+</style>
+"""
+
 # ── Página registrar resultados ────────────────────────────────────────────────
 def pagina_registrar_resultados():
     if not es_arbitro():
@@ -393,10 +432,12 @@ def pagina_registrar_resultados():
 
     st.markdown(
         "<div class='unaffdo-header'>Registrar Resultados</div>"
-        "<div class='unaffdo-sub'>Panel de &aacute;rbitros</div>"
+        "<div class='unaffdo-sub'>Panel de &aacute;rbitros &middot; IFAF 2026</div>"
         "<div class='unaffdo-divider'></div>",
         unsafe_allow_html=True,
     )
+    st.markdown(SCORING_CSS, unsafe_allow_html=True)
+
     session = get_session()
     try:
         temporada = session.query(Temporada).filter_by(activa=True).first()
@@ -424,30 +465,106 @@ def pagina_registrar_resultados():
         partido_id = opciones[seleccion]
         partido    = session.get(Partido, partido_id)
 
-        local_nombre    = equipos_map[partido.equipo_local_id].nombre
+        local_nombre     = equipos_map[partido.equipo_local_id].nombre
         visitante_nombre = equipos_map[partido.equipo_visitante_id].nombre
 
+        # Resetear marcador si cambia el partido seleccionado
+        if st.session_state.get("scoring_partido_id") != partido_id:
+            st.session_state["scoring_partido_id"] = partido_id
+            st.session_state["score_local"]     = 0
+            st.session_state["score_visitante"] = 0
+
+        sl = st.session_state["score_local"]
+        sv = st.session_state["score_visitante"]
+
+        # ── Marcador visual ──
         st.markdown(
-            f'<div class="match-row" style="margin:16px 0;font-size:1.2rem;">'
-            f'<span class="match-team">{local_nombre}</span>'
-            f'<span class="match-at">VS</span>'
-            f'<span class="match-team right">{visitante_nombre}</span>'
+            f'<div class="score-board">'
+            f'<div class="score-team-block">'
+            f'<div class="score-team-name">{local_nombre}</div>'
+            f'<div class="score-display">{sl}</div>'
+            f'</div>'
+            f'<div class="score-sep">—</div>'
+            f'<div class="score-team-block">'
+            f'<div class="score-team-name">{visitante_nombre}</div>'
+            f'<div class="score-display">{sv}</div>'
+            f'</div>'
             f'</div>',
             unsafe_allow_html=True,
         )
 
-        col1, col2 = st.columns(2)
-        with col1:
-            pts_local = st.number_input(f"Puntos {local_nombre}", min_value=0, step=1, key="pts_l")
-        with col2:
-            pts_visitante = st.number_input(f"Puntos {visitante_nombre}", min_value=0, step=1, key="pts_v")
+        # ── Leyenda IFAF ──
+        st.markdown(
+            '<div class="ifaf-legend">'
+            '<div class="ifaf-badge"><span>TD</span>Touchdown = 6 pts</div>'
+            '<div class="ifaf-badge"><span>Conv 1pt</span>Desde 5 yds = 1 pt</div>'
+            '<div class="ifaf-badge"><span>Conv 2pts</span>Desde 10 yds = 2 pts</div>'
+            '<div class="ifaf-badge"><span>Safety</span>= 2 pts</div>'
+            '<div class="ifaf-badge"><span>Int. Conv.</span>Def. intercepta = 2 pts</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
 
-        if st.button("Guardar resultado", type="primary"):
-            partido.puntos_local    = int(pts_local)
-            partido.puntos_visitante = int(pts_visitante)
-            session.commit()
-            st.success(f"Resultado guardado: {local_nombre} {pts_local} - {pts_visitante} {visitante_nombre}")
-            st.rerun()
+        # ── Botones de anotación ──
+        ANOTACIONES = [
+            ("TD",       "Touchdown",         6),
+            ("Conv 1pt", "Conversión 1 pt",   1),
+            ("Conv 2pt", "Conversión 2 pts",  2),
+            ("Safety",   "Safety / Int.Conv", 2),
+        ]
+
+        col_l, col_sep, col_r = st.columns([5, 1, 5])
+
+        with col_l:
+            st.markdown(f"**{local_nombre}**")
+            btn_cols = st.columns(len(ANOTACIONES))
+            for i, (key, label, pts) in enumerate(ANOTACIONES):
+                with btn_cols[i]:
+                    if st.button(f"+{pts}\n{key}", key=f"L_{key}", use_container_width=True):
+                        st.session_state["score_local"] += pts
+                        st.rerun()
+            if st.button("↩ Corrección -1", key="L_corr", use_container_width=True):
+                st.session_state["score_local"] = max(0, st.session_state["score_local"] - 1)
+                st.rerun()
+
+        with col_sep:
+            st.markdown("<div style='height:100%;border-left:1px solid #2A2A40;margin:0 auto;width:1px'></div>",
+                        unsafe_allow_html=True)
+
+        with col_r:
+            st.markdown(f"**{visitante_nombre}**")
+            btn_cols = st.columns(len(ANOTACIONES))
+            for i, (key, label, pts) in enumerate(ANOTACIONES):
+                with btn_cols[i]:
+                    if st.button(f"+{pts}\n{key}", key=f"V_{key}", use_container_width=True):
+                        st.session_state["score_visitante"] += pts
+                        st.rerun()
+            if st.button("↩ Corrección -1", key="V_corr", use_container_width=True):
+                st.session_state["score_visitante"] = max(0, st.session_state["score_visitante"] - 1)
+                st.rerun()
+
+        st.divider()
+
+        # ── Guardar ──
+        col_reset, col_save = st.columns([1, 3])
+        with col_reset:
+            if st.button("Reiniciar marcador", use_container_width=True):
+                st.session_state["score_local"]     = 0
+                st.session_state["score_visitante"] = 0
+                st.rerun()
+        with col_save:
+            if st.button(
+                f"Guardar  {local_nombre} {sl} — {sv} {visitante_nombre}",
+                type="primary", use_container_width=True,
+            ):
+                partido.puntos_local     = sl
+                partido.puntos_visitante = sv
+                session.commit()
+                # Limpiar estado del marcador
+                for k in ["score_local", "score_visitante", "scoring_partido_id"]:
+                    st.session_state.pop(k, None)
+                st.success(f"Resultado guardado: {local_nombre} {sl} — {sv} {visitante_nombre}")
+                st.rerun()
     finally:
         session.close()
 
