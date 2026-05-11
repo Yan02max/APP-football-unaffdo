@@ -337,13 +337,10 @@ def pagina_calendario():
             st.warning("No hay temporada activa.")
             return
 
-        if len(temporadas) > 1:
-            tabs = st.tabs([t.categoria for t in temporadas])
-            for tab, temporada in zip(tabs, temporadas):
-                with tab:
-                    _render_calendario(session, temporada)
-        else:
-            _render_calendario(session, temporadas[0])
+        categorias = [t.categoria for t in temporadas]
+        cat_sel = st.selectbox("Categoría:", categorias, key="cal_cat")
+        temporada = next(t for t in temporadas if t.categoria == cat_sel)
+        _render_calendario(session, temporada)
     finally:
         session.close()
 
@@ -396,13 +393,10 @@ def pagina_clasificacion():
             st.warning("No hay temporada activa.")
             return
 
-        if len(temporadas) > 1:
-            tabs = st.tabs([t.categoria for t in temporadas])
-            for tab, temporada in zip(tabs, temporadas):
-                with tab:
-                    _render_clasificacion(session, temporada)
-        else:
-            _render_clasificacion(session, temporadas[0])
+        categorias = [t.categoria for t in temporadas]
+        cat_sel = st.selectbox("Categoría:", categorias, key="clas_cat")
+        temporada = next(t for t in temporadas if t.categoria == cat_sel)
+        _render_clasificacion(session, temporada)
     finally:
         session.close()
 
@@ -462,18 +456,19 @@ def pagina_registrar_resultados():
 
     session = get_session()
     try:
-        temporadas_activas = session.query(Temporada).filter_by(activa=True).all()
+        temporadas_activas = session.query(Temporada).filter_by(activa=True).order_by(Temporada.categoria).all()
         if not temporadas_activas:
             st.warning("No hay temporada activa.")
             return
 
-        ids_temporadas = [t.id for t in temporadas_activas]
-        temporadas_map = {t.id: t for t in temporadas_activas}
+        categorias = [t.categoria for t in temporadas_activas]
+        cat_sel = st.selectbox("Categoría:", categorias, key="res_cat")
+        temporada_sel = next(t for t in temporadas_activas if t.categoria == cat_sel)
 
         pendientes = (
             session.query(Partido)
-            .filter(Partido.temporada_id.in_(ids_temporadas), Partido.puntos_local.is_(None))
-            .order_by(Partido.temporada_id, Partido.jornada, Partido.bloque)
+            .filter(Partido.temporada_id == temporada_sel.id, Partido.puntos_local.is_(None))
+            .order_by(Partido.jornada, Partido.bloque)
             .all()
         )
         if not pendientes:
@@ -481,9 +476,8 @@ def pagina_registrar_resultados():
             return
 
         equipos_map = {e.id: e for e in session.query(Equipo).all()}
-        cat_label = lambda p: temporadas_map[p.temporada_id].categoria
         opciones = {
-            f"[{cat_label(p)}] J{p.jornada} B{p.bloque} | {equipos_map[p.equipo_local_id].nombre} vs {equipos_map[p.equipo_visitante_id].nombre}": p.id
+            f"J{p.jornada} B{p.bloque} | {equipos_map[p.equipo_local_id].nombre} vs {equipos_map[p.equipo_visitante_id].nombre}": p.id
             for p in pendientes
         }
 
