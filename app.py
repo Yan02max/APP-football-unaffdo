@@ -13,6 +13,10 @@ from auth import (
     cargar_config, crear_autenticador,
     esta_autenticado, es_admin, es_arbitro,
 )
+from init_db import inicializar
+
+# Auto-inicializar la BD si no existe (necesario en Streamlit Cloud)
+inicializar()
 
 st.set_page_config(
     page_title="UNAFFDO - Torneos",
