@@ -45,15 +45,39 @@ def _migrar_schema():
                 conn.commit()
             print(f"[OK] Columna '{columna}' agregada a '{tabla}'.")
 
-    # Reemplazar unique(nombre) por unique(nombre, categoria) en equipos
+    # Reconstruir equipos si el unique sigue siendo solo (nombre) en vez de (nombre, categoria)
     if "equipos" in tablas:
         with engine.connect() as conn:
-            conn.execute(text("DROP INDEX IF EXISTS ix_equipos_nombre"))
-            conn.execute(text(
-                "CREATE UNIQUE INDEX IF NOT EXISTS uq_equipo_nombre_cat "
-                "ON equipos(nombre, categoria)"
-            ))
-            conn.commit()
+            indexes = conn.execute(text("PRAGMA index_list('equipos')")).fetchall()
+            tiene_combinado = any(
+                {c[2] for c in conn.execute(text(f"PRAGMA index_info('{row[1]}')")).fetchall()}
+                == {"nombre", "categoria"}
+                for row in indexes if row[2]  # solo índices únicos
+            )
+            if not tiene_combinado:
+                conn.execute(text("""
+                    CREATE TABLE equipos_new (
+                        id INTEGER NOT NULL,
+                        nombre VARCHAR(100) NOT NULL,
+                        abreviacion VARCHAR(10) NOT NULL,
+                        color_principal VARCHAR(7),
+                        color_secundario VARCHAR(7),
+                        logo_path VARCHAR(255),
+                        categoria VARCHAR(50) NOT NULL DEFAULT 'Masculino',
+                        PRIMARY KEY (id),
+                        UNIQUE (nombre, categoria)
+                    )
+                """))
+                conn.execute(text("""
+                    INSERT INTO equipos_new
+                        (id, nombre, abreviacion, color_principal, color_secundario, logo_path, categoria)
+                    SELECT id, nombre, abreviacion, color_principal, color_secundario, logo_path, categoria
+                    FROM equipos
+                """))
+                conn.execute(text("DROP TABLE equipos"))
+                conn.execute(text("ALTER TABLE equipos_new RENAME TO equipos"))
+                conn.commit()
+                print("[OK] Tabla equipos reconstruida: unique ahora es (nombre, categoria).")
 
 
 def _crear_temporada_y_calendario(session, nombre, categoria, fecha_inicio, equipos):
