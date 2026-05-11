@@ -1,4 +1,5 @@
 """Lógica de torneo: generación de calendario y cálculo de clasificación."""
+import random
 from datetime import date, timedelta
 
 
@@ -16,6 +17,7 @@ def generar_calendario_round_robin(equipos: list, fecha_inicio: date) -> list[di
     assert n % 2 == 0, "Se requiere número par de equipos"
 
     ids = [e.id for e in equipos]
+    random.shuffle(ids)  # orden aleatorio de equipos → emparejamientos distintos cada vez
 
     # Método del círculo: fijar ids[0], rotar el resto
     fijo = ids[0]
