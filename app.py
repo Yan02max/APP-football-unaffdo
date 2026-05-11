@@ -652,16 +652,19 @@ def pagina_gestionar_equipos():
             else:
                 s = get_session()
                 try:
-                    s.add(Equipo(
-                        nombre=nuevo_nombre.strip(),
-                        abreviacion=nuevo_abrev.strip().upper(),
-                        color_principal=nuevo_color1,
-                        color_secundario=nuevo_color2,
-                        categoria=nueva_categoria,
-                    ))
-                    s.commit()
-                    st.success(f"Equipo '{nuevo_nombre.strip()}' agregado a categoría {nueva_categoria}.")
-                    st.rerun()
+                    if s.query(Equipo).filter_by(nombre=nuevo_nombre.strip()).first():
+                        st.error(f"Ya existe un equipo llamado '{nuevo_nombre.strip()}'.")
+                    else:
+                        s.add(Equipo(
+                            nombre=nuevo_nombre.strip(),
+                            abreviacion=nuevo_abrev.strip().upper(),
+                            color_principal=nuevo_color1,
+                            color_secundario=nuevo_color2,
+                            categoria=nueva_categoria,
+                        ))
+                        s.commit()
+                        st.success(f"Equipo '{nuevo_nombre.strip()}' agregado a categoría {nueva_categoria}.")
+                        st.rerun()
                 except Exception as exc:
                     s.rollback()
                     st.error(f"Error: {exc}")

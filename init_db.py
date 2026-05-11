@@ -88,6 +88,16 @@ def inicializar(reset: bool = False):
     session = get_session()
     try:
         if session.query(Equipo).count() > 0:
+            # Restaurar categoría de los equipos originales si fue cambiada por error
+            cambiados = 0
+            for datos in EQUIPOS_MASCULINO:
+                eq = session.query(Equipo).filter_by(nombre=datos["nombre"]).first()
+                if eq and eq.categoria != datos["categoria"]:
+                    eq.categoria = datos["categoria"]
+                    cambiados += 1
+            if cambiados:
+                session.commit()
+                print(f"[OK] {cambiados} categorías de equipos originales restauradas.")
             print("La BD ya contiene datos. Usa --reset para reiniciar.")
             return
 
