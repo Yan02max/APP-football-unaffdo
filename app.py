@@ -606,6 +606,54 @@ def pagina_gestionar_equipos():
     finally:
         session.close()
 
+    # ── Zona de peligro ──────────────────────────────────────────────────────
+    st.markdown(
+        '<div style="margin-top:2.5rem;border:1px solid #660000;border-radius:8px;padding:20px 24px;">'
+        '<div style="font-family:Barlow Condensed,sans-serif;font-size:1.4rem;font-weight:800;'
+        'letter-spacing:2px;color:#CC0000;text-transform:uppercase;margin-bottom:4px;">Zona de Peligro</div>'
+        '<div style="font-size:.8rem;color:#8888AA;margin-bottom:16px;">Estas acciones no se pueden deshacer.</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    # ── Opción 1: borrar solo los resultados ─────────────────────────────────
+    with st.expander("Borrar todos los resultados (mantiene el calendario)"):
+        st.warning(
+            "Esto pone a NULL los marcadores de todos los partidos. "
+            "El calendario, los equipos y la temporada se conservan."
+        )
+        confirmar1 = st.checkbox(
+            "Entiendo que se borrarán todos los resultados registrados",
+            key="confirm_borrar_resultados",
+        )
+        if st.button("Borrar resultados", type="primary", disabled=not confirmar1, key="btn_borrar_res"):
+            session2 = get_session()
+            try:
+                session2.query(Partido).update(
+                    {"puntos_local": None, "puntos_visitante": None}
+                )
+                session2.commit()
+                st.success("Resultados eliminados. La tabla de posiciones está en cero.")
+                st.rerun()
+            finally:
+                session2.close()
+
+    # ── Opción 2: reinicio completo del torneo ────────────────────────────────
+    with st.expander("Reinicio completo del torneo (borra TODO y regenera)"):
+        st.error(
+            "Esto elimina equipos, temporada, partidos y resultados, "
+            "y vuelve a crear la base de datos desde cero con los datos originales."
+        )
+        confirmar2 = st.checkbox(
+            "Entiendo que se perderán TODOS los datos del torneo",
+            key="confirm_reset_total",
+        )
+        if st.button("Reiniciar torneo completo", type="primary", disabled=not confirmar2, key="btn_reset_total"):
+            from init_db import inicializar
+            inicializar(reset=True)
+            st.success("Torneo reiniciado. Equipos y calendario regenerados.")
+            st.rerun()
+
 
 # ── Punto de entrada ───────────────────────────────────────────────────────────
 # Mostrar login como pantalla inicial si el usuario no está autenticado
